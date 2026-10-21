@@ -1,0 +1,191 @@
+/* Student Attendance Management System - simple custom styles (on top of Bootstrap 5) */
+
+body {
+    background-color: #f5f7fa;
+    color: #212529;
+}
+
+/* ----- Layout: menu on the left, page on the right ----- */
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-area {
+    flex: 1;
+    min-width: 0;
+}
+
+.page-content {
+    padding: 1.5rem;
+}
+
+/* ----- Left menu ----- */
+.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background-color: #ffffff;
+    border-right: 1px solid #e3e6ea;
+    padding: 1.25rem 1rem;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #0d6efd;
+    margin-bottom: 1.25rem;
+}
+
+.user-info {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e3e6ea;
+}
+
+.user-name {
+    display: block;
+    font-weight: 600;
+}
+
+.user-role {
+    display: block;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.menu {
+    flex: 1;
+}
+
+.menu-link {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.25rem;
+    border-radius: 6px;
+    color: #343a40;
+    text-decoration: none;
+}
+
+    .menu-link:hover {
+        background-color: #f1f3f5;
+    }
+
+    .menu-link.active {
+        background-color: #e7f1ff;
+        color: #0d6efd;
+        font-weight: 600;
+    }
+
+.logout-button {
+    width: 100%;
+}
+
+/* ----- Title on Login / Sign Up ----- */
+.guest-title {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 2rem 1rem 0;
+}
+
+/* ----- Cards and headings ----- */
+.card {
+    border: 1px solid #e3e6ea;
+    border-radius: 8px;
+}
+
+.page-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+/* Dashboard numbers */
+.stat-card {
+    background-color: #ffffff;
+    border: 1px solid #e3e6ea;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.stat-present .stat-value {
+    color: #198754;
+}
+
+.stat-absent .stat-value {
+    color: #dc3545;
+}
+
+.stat-pending .stat-value {
+    color: #b8860b;
+}
+
+/* Student table */
+.student-table {
+    background-color: #ffffff;
+}
+
+    .student-table th {
+        background-color: #f1f3f5;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+/* Student details on the Mark Attendance page */
+.detail-table th {
+    width: 40%;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Present / Absent radio buttons */
+.status-options label {
+    margin-left: 0.35rem;
+    margin-right: 1.5rem;
+}
+
+/* Validator messages */
+.field-error {
+    color: #dc3545;
+    font-size: 0.85rem;
+}
+
+/* ----- Phones: menu moves to the top ----- */
+@media (max-width: 767px) {
+    .app-shell {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: static;
+        border-right: none;
+        border-bottom: 1px solid #e3e6ea;
+    }
+
+    .menu {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .page-content {
+        padding: 1rem;
+    }
+}

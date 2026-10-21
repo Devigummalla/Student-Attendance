@@ -1,0 +1,13 @@
+# Secrets and local settings - never commit these
+ConnectionStrings.config
+Secrets.config
+
+# Logs
+App_Data/Logs/
+
+# Visual Studio / build output
+.vs/
+bin/
+obj/
+packages/
+*.user

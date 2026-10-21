@@ -1,0 +1,61 @@
+<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="Site.Master.cs" Inherits="Student_Att.SiteMaster" %>
+
+<!DOCTYPE html>
+<html lang="en">
+<head runat="server">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%: Page.Title %> - Student Attendance</title>
+    <%-- Bootstrap files that came with the Visual Studio template (works offline) --%>
+    <link href="~/Content/bootstrap.min.css" rel="stylesheet" runat="server" />
+    <%-- ?v=3 makes the browser download the new version instead of an old cached copy --%>
+    <link href="~/Content/Site.css?v=3" rel="stylesheet" runat="server" />
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div class="app-shell">
+
+            <%-- Left menu: only when logged in --%>
+            <asp:PlaceHolder ID="phSidebar" runat="server" Visible="false">
+                <aside class="sidebar">
+                    <div class="brand">Student Attendance</div>
+
+                    <div class="user-info">
+                        <asp:Label ID="lblUserName" runat="server" CssClass="user-name" />
+                        <asp:Label ID="lblRole" runat="server" CssClass="user-role" />
+                    </div>
+
+                    <nav class="menu">
+                        <a class="menu-link <%: GetActiveClass("~/Secure/Dashboard.aspx") %>"
+                           href="<%: ResolveUrl("~/Secure/Dashboard.aspx") %>">Dashboard</a>
+                        <a class="menu-link <%: GetActiveClass("~/Secure/StudentList.aspx", "~/Secure/MarkAttendance.aspx") %>"
+                           href="<%: ResolveUrl("~/Secure/StudentList.aspx") %>">Mark Attendance</a>
+                        <asp:PlaceHolder ID="phAdminLink" runat="server" Visible="false">
+                            <a class="menu-link <%: GetActiveClass("~/Admin/ManageStudents.aspx") %>"
+                               href="<%: ResolveUrl("~/Admin/ManageStudents.aspx") %>">Manage Students</a>
+                        </asp:PlaceHolder>
+                    </nav>
+
+                    <asp:LinkButton ID="btnLogout" runat="server" CssClass="btn btn-outline-danger btn-sm logout-button"
+                        CausesValidation="false" OnClick="btnLogout_Click">Logout</asp:LinkButton>
+                </aside>
+            </asp:PlaceHolder>
+
+            <%-- Page content --%>
+            <div class="main-area">
+                <%-- Title shown on Login / Sign Up (not logged in) --%>
+                <asp:PlaceHolder ID="phGuestHeader" runat="server">
+                    <h1 class="guest-title">Student Attendance Management System</h1>
+                </asp:PlaceHolder>
+
+                <main class="page-content">
+                    <asp:ContentPlaceHolder ID="MainContent" runat="server">
+                    </asp:ContentPlaceHolder>
+                </main>
+            </div>
+        </div>
+    </form>
+
+    <script src="<%: ResolveUrl("~/Scripts/bootstrap.bundle.min.js") %>"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!--
+  ADD these parts to your existing Web.config. Keep everything else that
+  Visual Studio already put there (compilation, httpRuntime, pages, runtime, codedom...).
+-->
+<configuration>
+
+  <!-- 1. Connection string comes from a separate file that is NOT committed to Git -->
+  <connectionStrings configSource="ConnectionStrings.config" />
+
+  <!-- 2. JWT secret comes from Secrets.config (also not in Git).
+          UnobtrusiveValidationMode=None lets the validators work without jQuery.
+          If <appSettings> already exists, just add file="Secrets.config" and the key. -->
+  <appSettings file="Secrets.config">
+    <add key="ValidationSettings:UnobtrusiveValidationMode" value="None" />
+  </appSettings>
+
+  <system.web>
+    <!-- (keep your existing <compilation>, <httpRuntime>, <pages> here) -->
+
+    <!-- We do our own login with JWT, so the built-in Forms login is switched off -->
+    <authentication mode="None" />
+
+    <!-- Users see Error.aspx instead of technical details.
+         RemoteOnly = you still see full errors on your own PC while developing.
+         Change to On to test the error page. -->
+    <customErrors mode="RemoteOnly" defaultRedirect="~/Error.aspx" />
+  </system.web>
+
+  <!-- 3. Who may open which folder -->
+  <!-- Secure: any logged-in user (? = anonymous / not logged in) -->
+  <location path="Secure">
+    <system.web>
+      <authorization>
+        <deny users="?" />
+      </authorization>
+    </system.web>
+  </location>
+
+  <!-- Admin: only users with the Admin role (* = everybody else) -->
+  <location path="Admin">
+    <system.web>
+      <authorization>
+        <allow roles="Admin" />
+        <deny users="*" />
+      </authorization>
+    </system.web>
+  </location>
+
+  <!-- 4. Register our JWT module so it runs on every page request.
+          If <system.webServer> already exists, put <modules> inside it. -->
+  <system.webServer>
+    <modules>
+      <add name="JwtAuthModule" type="Student_Att.Security.JwtAuthModule" preCondition="managedHandler" />
+    </modules>
+  </system.webServer>
+
+</configuration>
