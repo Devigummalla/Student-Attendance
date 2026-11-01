@@ -1,88 +1,90 @@
 using System;
-using System.Data;
-using System.Data.SqlClient;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using Student_Att.Entities;
 using Student_Att.Models;
 
 namespace Student_Att.DataAccess
 {
-    // Database work for the Attendance table
+    // Database work for the Attendance table (EF Core + LINQ)
     public class AttendanceRepository
     {
         // Returns null when attendance has NOT been taken today
         public AttendanceRecord GetTodayAttendance(int studentId)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_GetTodayAttendance", connection))
+            DateTime today = DateTime.Today;
+
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@StudentId", SqlDbType.Int).Value = studentId;
+                var query = from a in db.Attendance
+                            join u in db.Users on a.MarkedByUserId equals u.UserId
+                            where a.StudentId == studentId && a.AttendanceDate == today
+                            select new AttendanceRecord
+                            {
+                                AttendanceStatus = a.AttendanceStatus,
+                                MarkedBy = u.FullName,
+                                MarkedAt = a.CreatedAt
+                            };
 
-                connection.Open();
-                using (SqlDataReader reader = command.ExecuteReader())
-                {
-                    if (!reader.Read())
-                    {
-                        return null;
-                    }
-
-                    AttendanceRecord record = new AttendanceRecord();
-                    record.AttendanceStatus = reader["AttendanceStatus"].ToString();
-                    record.MarkedBy = reader["MarkedBy"].ToString();
-                    record.MarkedAt = Convert.ToDateTime(reader["MarkedAt"]);
-                    return record;
-                }
+                return query.FirstOrDefault();
             }
         }
 
         public MarkAttendanceResult MarkAttendance(int studentId, string status, int markedByUserId)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_MarkAttendance", connection))
+            // The date always comes from the server, never from the browser
+            DateTime today = DateTime.Today;
+
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@StudentId", SqlDbType.Int).Value = studentId;
-                command.Parameters.Add("@AttendanceStatus", SqlDbType.VarChar, 10).Value = status;
-                command.Parameters.Add("@MarkedByUserId", SqlDbType.Int).Value = markedByUserId;
-
-                connection.Open();
-                int result = Convert.ToInt32(command.ExecuteScalar());
-                return (MarkAttendanceResult)result;
-            }
-        }
-
-        public TodaySummary GetTodaySummary()
-        {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_GetTodaySummary", connection))
-            {
-                command.CommandType = CommandType.StoredProcedure;
-
-                connection.Open();
-                using (SqlDataReader reader = command.ExecuteReader())
+                // Check 1: already marked today?
+                bool alreadyMarked = db.Attendance.Any(a => a.StudentId == studentId && a.AttendanceDate == today);
+                if (alreadyMarked)
                 {
-                    TodaySummary summary = new TodaySummary();
+                    return MarkAttendanceResult.AlreadySubmitted;
+                }
 
-                    if (reader.Read())
+                Attendance record = new Attendance();
+                record.StudentId = studentId;
+                record.AttendanceDate = today;
+                record.AttendanceStatus = status;
+                record.MarkedByUserId = markedByUserId;
+                record.CreatedAt = DateTime.Now;
+
+                db.Attendance.Add(record);
+
+                try
+                {
+                    db.SaveChanges();
+                    return MarkAttendanceResult.Saved;
+                }
+                catch (DbUpdateException ex)
+                {
+                    // Check 2: UNIQUE (StudentId, AttendanceDate) in the database.
+                    // Happens if two requests arrive at the same moment.
+                    if (DbErrorHelper.IsDuplicateKey(ex))
                     {
-                        summary.TotalStudents = ToInt(reader["TotalStudents"]);
-                        summary.PresentCount = ToInt(reader["PresentCount"]);
-                        summary.AbsentCount = ToInt(reader["AbsentCount"]);
-                        summary.NotMarkedCount = ToInt(reader["NotMarkedCount"]);
+                        return MarkAttendanceResult.AlreadySubmitted;
                     }
-
-                    return summary;
+                    throw;
                 }
             }
         }
 
-        // SUM() returns NULL when there are no rows, so treat NULL as 0
-        private int ToInt(object value)
+        // Dashboard numbers for today
+        public TodaySummary GetTodaySummary()
         {
-            if (value == DBNull.Value)
+            DateTime today = DateTime.Today;
+
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                return 0;
+                TodaySummary summary = new TodaySummary();
+                summary.TotalStudents = db.Students.Count(s => s.IsActive == true);
+                summary.PresentCount = db.Attendance.Count(a => a.AttendanceDate == today && a.AttendanceStatus == "Present");
+                summary.AbsentCount = db.Attendance.Count(a => a.AttendanceDate == today && a.AttendanceStatus == "Absent");
+                summary.NotMarkedCount = summary.TotalStudents - summary.PresentCount - summary.AbsentCount;
+                return summary;
             }
-            return Convert.ToInt32(value);
         }
     }
 }

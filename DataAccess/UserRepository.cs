@@ -1,56 +1,87 @@
 using System;
-using System.Data;
-using System.Data.SqlClient;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using Student_Att.Entities;
 using Student_Att.Models;
 
 namespace Student_Att.DataAccess
 {
-    // Database work for the Users table
+    // Database work for the Users table (EF Core)
     public class UserRepository
     {
         public RegisterResult RegisterUser(string fullName, string email, string username, string pinHash)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_RegisterUser", connection))
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@FullName", SqlDbType.NVarChar, 100).Value = fullName;
-                command.Parameters.Add("@Email", SqlDbType.NVarChar, 150).Value = email;
-                command.Parameters.Add("@Username", SqlDbType.NVarChar, 50).Value = username;
-                command.Parameters.Add("@PinHash", SqlDbType.VarChar, 200).Value = pinHash;
+                // Friendly checks first
+                if (db.Users.Any(u => u.Username == username))
+                {
+                    return RegisterResult.UsernameTaken;
+                }
+                if (db.Users.Any(u => u.Email == email))
+                {
+                    return RegisterResult.EmailTaken;
+                }
 
-                connection.Open();
-                int result = Convert.ToInt32(command.ExecuteScalar());
-                return (RegisterResult)result;
+                Users newUser = new Users();
+                newUser.FullName = fullName;
+                newUser.Email = email;
+                newUser.Username = username;
+                newUser.PinHash = pinHash;
+                newUser.Role = "Faculty";          // self sign-up is always Faculty
+                newUser.IsActive = true;
+                newUser.CreatedAt = DateTime.Now;
+
+                db.Users.Add(newUser);
+
+                try
+                {
+                    db.SaveChanges();              // INSERT happens here
+                    return RegisterResult.Success;
+                }
+                catch (DbUpdateException ex)
+                {
+                    // Two people signed up with the same username/email at the same moment:
+                    // the UNIQUE rule in the database stopped the second one.
+                    if (!DbErrorHelper.IsDuplicateKey(ex))
+                    {
+                        throw;
+                    }
+                }
+            }
+
+            // Find out which value was taken, using a fresh context
+            using (AttendanceDbContext db = new AttendanceDbContext())
+            {
+                if (db.Users.Any(u => u.Username == username))
+                {
+                    return RegisterResult.UsernameTaken;
+                }
+                return RegisterResult.EmailTaken;
             }
         }
 
         // Returns null when no user has this username or email
         public User GetUserForLogin(string login)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_GetUserForLogin", connection))
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@Login", SqlDbType.NVarChar, 150).Value = login;
+                Users found = db.Users.FirstOrDefault(u => u.Username == login || u.Email == login);
 
-                connection.Open();
-                using (SqlDataReader reader = command.ExecuteReader())
+                if (found == null)
                 {
-                    if (!reader.Read())
-                    {
-                        return null;
-                    }
-
-                    User user = new User();
-                    user.UserId = Convert.ToInt32(reader["UserId"]);
-                    user.FullName = reader["FullName"].ToString();
-                    user.Username = reader["Username"].ToString();
-                    user.PinHash = reader["PinHash"].ToString();
-                    user.Role = reader["Role"].ToString();
-                    user.IsActive = Convert.ToBoolean(reader["IsActive"]);
-                    return user;
+                    return null;
                 }
+
+                // Copy the database entity into our own model class
+                User user = new User();
+                user.UserId = found.UserId;
+                user.FullName = found.FullName;
+                user.Username = found.Username;
+                user.PinHash = found.PinHash;
+                user.Role = found.Role;
+                user.IsActive = found.IsActive == true;   // IsActive is bool? in the scaffolded entity
+                return user;
             }
         }
     }

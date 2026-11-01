@@ -1,6 +1,6 @@
 using System;
-using System.Data;
-using System.Data.SqlClient;
+using System.Linq;
+using Student_Att.Entities;
 
 namespace Student_Att.DataAccess
 {
@@ -9,43 +9,44 @@ namespace Student_Att.DataAccess
     {
         public void SaveSession(Guid tokenId, int userId, DateTime expiresAt)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_SaveSession", connection))
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@TokenId", SqlDbType.UniqueIdentifier).Value = tokenId;
-                command.Parameters.Add("@UserId", SqlDbType.Int).Value = userId;
-                command.Parameters.Add("@ExpiresAt", SqlDbType.DateTime).Value = expiresAt;
+                UserSessions session = new UserSessions();
+                session.TokenId = tokenId;
+                session.UserId = userId;
+                session.ExpiresAt = expiresAt;
+                session.IsLoggedOut = false;
+                session.CreatedAt = DateTime.Now;
 
-                connection.Open();
-                command.ExecuteNonQuery();
+                db.UserSessions.Add(session);
+                db.SaveChanges();
             }
         }
 
+        // Valid = this token exists, the user has not logged out, and it has not expired
         public bool IsSessionValid(Guid tokenId)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_IsSessionValid", connection))
-            {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@TokenId", SqlDbType.UniqueIdentifier).Value = tokenId;
+            DateTime now = DateTime.Now;
 
-                connection.Open();
-                int count = Convert.ToInt32(command.ExecuteScalar());
-                return count > 0;
+            using (AttendanceDbContext db = new AttendanceDbContext())
+            {
+                return db.UserSessions.Any(s => s.TokenId == tokenId
+                                             && s.IsLoggedOut == false
+                                             && s.ExpiresAt > now);
             }
         }
 
         public void EndSession(Guid tokenId)
         {
-            using (SqlConnection connection = DbHelper.GetConnection())
-            using (SqlCommand command = new SqlCommand("usp_EndSession", connection))
+            using (AttendanceDbContext db = new AttendanceDbContext())
             {
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.Add("@TokenId", SqlDbType.UniqueIdentifier).Value = tokenId;
+                UserSessions session = db.UserSessions.FirstOrDefault(s => s.TokenId == tokenId);
 
-                connection.Open();
-                command.ExecuteNonQuery();
+                if (session != null)
+                {
+                    session.IsLoggedOut = true;   // EF Core notices the change...
+                    db.SaveChanges();             // ...and sends an UPDATE
+                }
             }
         }
     }
