@@ -33,7 +33,6 @@ Student-Att/                          <- repository root
 ├── README.md
 ├── .gitignore
 ├── Database/                         <- SQL scripts (run these first)
-├── Docs/                             <- technical documentation
 ├── Screenshots/                      <- screenshots of every page and test case
 └── Student-Att/                      <- the web project
     ├── Account/                      Login and Sign Up pages
