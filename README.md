@@ -6,10 +6,12 @@ This is my mini project for the .NET training. It is an ASP.NET Web Forms applic
 
 - ASP.NET Web Forms (.NET Framework 4.7.2)
 - C#
-- ADO.NET with stored procedures
+- Entity Framework Core 3.1.32 (database first) with LINQ
 - SQL Server (LocalDB / SQL Server Express)
 - Bootstrap 5 (the copy that comes with the Visual Studio template, so it works offline)
-- JWT for login, stored in a cookie
+- JWT for login, stored in an HttpOnly cookie
+
+EF Core 3.1 is used because it is the last EF Core version that supports .NET Framework.
 
 ## Prerequisites
 
@@ -31,13 +33,15 @@ Student-Att/                          <- repository root
 ├── README.md
 ├── .gitignore
 ├── Database/                         <- SQL scripts (run these first)
+├── Docs/                             <- technical documentation
 ├── Screenshots/                      <- screenshots of every page and test case
 └── Student-Att/                      <- the web project
     ├── Account/                      Login and Sign Up pages
     ├── Secure/                       Dashboard, Student List, Mark Attendance (login required)
     ├── Admin/                        Manage Students (Admin role only)
     ├── Models/                       Classes like User, Student, Department
-    ├── DataAccess/                   ADO.NET code that calls the stored procedures
+    ├── Entities/                     EF Core classes generated from the database + AttendanceDbContext
+    ├── DataAccess/                   Repositories that query the database with EF Core (LINQ)
     ├── Business/                     Validation and rules
     ├── Security/                     PIN hashing, JWT, login cookie
     ├── Logging/                      Writes errors to App_Data/Logs
@@ -63,8 +67,8 @@ Clone the repository (or unzip it) into any folder, for example `C:\Projects\Stu
 
 | Script | What it does |
 |---|---|
-| `01_CreateDatabase.sql` | Creates the `StudentAttendanceDB` database and the tables |
-| `02_StoredProcedures.sql` | Creates the stored procedures |
+| `01_CreateDatabase.sql` | Creates the `StudentAttendanceDB` database and the five tables |
+| `02_StoredProcedures.sql` | Creates the stored procedures. The app now uses EF Core, but `03_SeedData.sql` still uses `usp_AddStudent` to create roll numbers, so run this script |
 | `03_SeedData.sql` | Adds 5 departments, 39 students and one admin user |
 | `04_TestQueries.sql` | Optional. Tests the database rules and rolls everything back |
 
@@ -91,7 +95,7 @@ These two files are not in Git because they contain machine-specific settings an
 
 **a) Connection string**
 
-Copy `ConnectionStrings.sample.config` and rename the copy to `ConnectionStrings.config`.
+Copy `ConnectionStrings.sample.config` and rename the copy to `ConnectionStrings.config`. The connection string is named `AttendanceDb`, and `AttendanceDbContext` reads it from here.
 
 If you use LocalDB, nothing needs to change. If you use SQL Express, change the `Data Source`:
 
@@ -116,9 +120,19 @@ Copy `Secrets.sample.config` and rename the copy to `Secrets.config`. Replace th
 ### Step 4: Build
 
 1. Double-click `Student-Att.slnx` to open it in Visual Studio.
-2. Press **Ctrl + Shift + B**. On the first build Visual Studio downloads the NuGet packages, which can take a minute.
+2. Press **Ctrl + Shift + B**. On the first build Visual Studio downloads the NuGet packages (including EF Core 3.1.32), which can take a minute.
    - If it says packages are missing: right-click the solution > **Restore NuGet Packages**, then build again.
 3. The Output window should end with `Build: 1 succeeded`.
+
+You may see 4 yellow **NU1902** warnings. They come from older libraries that EF Core 3.1 depends on. They are warnings, not errors, and the app still runs.
+
+The EF Core classes in `Entities/` are already in the project, so you do not need to scaffold again. If the database changes later, regenerate them in **Tools > NuGet Package Manager > Package Manager Console**:
+
+```
+Scaffold-DbContext "Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=StudentAttendanceDB;Integrated Security=True" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Entities -Context AttendanceDbContext -Tables Users,UserSessions,Departments,Students,Attendance -Force
+```
+
+After scaffolding, change `OnConfiguring` in `AttendanceDbContext` back to read the connection string from `ConfigurationManager.ConnectionStrings["AttendanceDb"]`, because the generated version hard-codes it.
 
 ### Step 5: Run
 
@@ -164,10 +178,10 @@ I handled this in four places so it cannot be bypassed:
 
 1. When the Mark Attendance page opens, it checks if a record already exists for today. If yes, it shows the popup and disables the Submit button.
 2. The Submit button disables itself after the first click, so double clicking does not send two requests.
-3. The stored procedure `usp_MarkAttendance` checks again before inserting.
-4. The `UNIQUE (StudentId, AttendanceDate)` constraint in the database blocks a second record even if someone inserts directly with SQL.
+3. `AttendanceRepository` checks again just before saving the new record.
+4. The `UNIQUE (StudentId, AttendanceDate)` constraint in the database blocks a second record even if two requests arrive together or someone inserts directly with SQL. EF Core raises a `DbUpdateException` (SQL error 2627), which the app catches and shows as the same popup.
 
-The attendance date is always taken from the server (`GETDATE()`), not from the user.
+The attendance date is always taken from the server (`DateTime.Today`), not from the user.
 
 ## Security notes
 
@@ -175,13 +189,13 @@ The attendance date is always taken from the server (`GETDATE()`), not from the 
 - After login a JWT is created and saved in an HttpOnly cookie. Every request checks the token signature, expiry, and whether the user has logged out.
 - On logout the token is marked as logged out in the `UserSessions` table, so the same token cannot be reused.
 - Pages under `/Secure` need login. Pages under `/Admin` need the Admin role. Both are set in `Web.config`.
-- All queries use stored procedures with parameters (no SQL injection).
+- All database access goes through EF Core LINQ queries, which are sent as parameterised SQL (no SQL injection).
 - The connection string and JWT secret are kept out of Git (`.gitignore`).
 - Errors are written to `App_Data/Logs` and the user only sees a simple error page.
 
 ## Testing
 
-I tested all the scenarios from the assignment (TC01 to TC16). Screenshots are in the `Screenshots` folder.
+I tested all the scenarios from the assignment (TC01 to TC16). Screenshots are in the `Screenshots` folder, and each test case is described in the technical documentation in `Docs`.
 
 A few quick ones to try:
 
@@ -190,12 +204,16 @@ A few quick ones to try:
 - Log out, then open `https://localhost:44338/Secure/Dashboard.aspx` directly: you are sent back to the Login page.
 - Log in as a Faculty user and open `https://localhost:44338/Admin/ManageStudents.aspx`: shows Access Denied.
 
+
+
 ## Common problems
 
 | Problem | Fix |
 |---|---|
 | Visual Studio cannot open `Student-Att.slnx` | Update Visual Studio 2022 to 17.13 or later |
 | Build error about missing NuGet packages | Right-click the solution > Restore NuGet Packages, then build again |
+| Yellow NU1902 warnings after build | Expected with EF Core 3.1; they do not stop the app |
+| "Unable to load DLL Microsoft.Data.SqlClient.SNI" | Add `<hostingEnvironment shadowCopyBinAssemblies="false" />` inside `<system.web>` in `Web.config`, then rebuild |
 | "Unable to open configSource file 'ConnectionStrings.config'" | Step 3a was skipped, or the file is not in the same folder as `Web.config` |
 | "JwtSecret is missing or shorter than 32 characters" | Step 3b was skipped, or the secret is too short |
 | "A network-related or instance-specific error" / cannot connect | The server name in `ConnectionStrings.config` does not match your SQL Server, or the database scripts were not run |
